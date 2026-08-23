@@ -1,0 +1,27 @@
+# AI tools
+.claude/
+.cursor/
+.aider*
+.copilot/
+*.ai.md
+CLAUDE.md
+
+# Secrets
+.env
+local.settings.json
+*.publishsettings
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Power BI temp
+*.pbix.tmp
+
+# Azure
+*.azurePubxml
+
+# OS
+.DS_Store
