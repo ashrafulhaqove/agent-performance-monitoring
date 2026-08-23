@@ -1,6 +1,6 @@
 # E-Commerce Contact Centre Performance Monitoring System
 
-End-to-end Azure data engineering pipeline for a simulated e-commerce contact centre. Ingests agent performance data via batch and streaming paths, stores and aggregates it in Azure SQL, and visualises team KPIs in a 7-page Power BI dashboard.
+End-to-end Azure data engineering pipeline for a simulated e-commerce contact centre. Ingests agent performance data via batch and streaming paths, stores and aggregates it in Azure SQL, applies an ML layer for anomaly detection, agent risk classification, and performance forecasting, and visualises results across Power BI Service and Tableau Public dashboards.
 
 ---
 
@@ -27,7 +27,7 @@ Python (kafka_producer.py)
     → Azure SQL: fact_daily_metrics
 ```
 
-Both paths write to the same fact table. The ADF stored procedure aggregates both into `agg_team_daily`, which is what Power BI reads.
+Both paths write to the same fact table. The ADF stored procedure aggregates both into `agg_team_daily`. A Python ML layer then produces anomaly flags, agent risk scores, and team forecasts — all stored back in Azure SQL and consumed by both BI platforms.
 
 ---
 
@@ -62,7 +62,9 @@ Each service line operates across 4 channels × 2 directions (inbound + outbound
 | Orchestration | Azure Data Factory (`agent-monitoring-adf`) | Free (1,000 DIU-hrs/month) |
 | Streaming | Upstash Kafka (topic: `agent-metrics`) | Free serverless |
 | Functions | Azure Functions (`kafka_consumer`) | Free (1M executions/month) |
-| BI | Power BI Desktop | Free |
+| ML | scikit-learn (Python) | Free |
+| BI | Power BI Service (browser-based) | Free |
+| BI | Tableau Public (Mac-native) | Free |
 
 ---
 
@@ -77,6 +79,9 @@ Each service line operates across 4 channels × 2 directions (inbound + outbound
 | `dim_date` | 90 | Date dimension for the simulation window |
 | `fact_daily_metrics` | 45,000 | Raw daily KPIs per agent; channel-specific columns NULL where not applicable |
 | `agg_team_daily` | ~1,440 | Team-level aggregates refreshed daily via MERGE stored procedure |
+| `fact_kpi_anomalies` | varies | Anomaly flags on team KPIs (Azure AI Anomaly Detector) |
+| `fact_agent_risk` | ~500/week | Per-agent risk score and flag from ML classifier |
+| `agg_team_predictions` | ~16/week | Next-week team KPI forecasts from regression model |
 | `pipeline_log` | 1 per run | ADF pipeline run status, row counts, and error messages |
 
 ---
@@ -90,14 +95,17 @@ Each service line operates across 4 channels × 2 directions (inbound + outbound
 │   └── 03_pipeline_log.sql     # pipeline_log table + insert logic
 ├── scripts/
 │   ├── generate_data.py        # Simulates 90 days of agent data, uploads to ADLS Gen2
-│   └── kafka_producer.py       # Streams agent events to Upstash Kafka topic
+│   ├── kafka_producer.py       # Streams agent events to Upstash Kafka topic
+│   ├── anomaly_detection.py    # Flags KPI anomalies → fact_kpi_anomalies
+│   ├── classify_agent_risk.py  # Risk classifier → fact_agent_risk
+│   └── predict_performance.py  # Team KPI forecast → agg_team_predictions
 ├── azure_functions/
 │   └── kafka_consumer/         # Azure Function: reads Kafka topic → writes to SQL
 ├── adf/
 │   └── pipeline_export.json    # ARM template export of pl_daily_team_aggregation
-├── powerbi/
-│   └── agent_monitoring.pbix   # 7-page Power BI dashboard
-├── screenshots/                # Dashboard screenshots
+├── powerbi/                    # Power BI Service screenshots + published link
+├── tableau/                    # Tableau Public screenshots + published link
+├── screenshots/                # Combined dashboard screenshots
 └── README.md
 ```
 
@@ -117,7 +125,21 @@ The pipeline logs every run (success and failure) to `pipeline_log` via TRY/CATC
 
 ---
 
-## Power BI Dashboard (7 Pages)
+## ML Layer
+
+Three scikit-learn scripts run after the ADF aggregation step:
+
+| Script | Input | Output table | Method |
+|---|---|---|---|
+| `anomaly_detection.py` | `agg_team_daily` | `fact_kpi_anomalies` | Isolation Forest |
+| `classify_agent_risk.py` | `fact_daily_metrics` | `fact_agent_risk` | Random Forest classifier |
+| `predict_performance.py` | `agg_team_daily` | `agg_team_predictions` | Linear Regression |
+
+No paid ML services — scikit-learn only, results stored back in Azure SQL.
+
+---
+
+## Power BI Service Dashboard (10 Pages)
 
 | Page | Contents |
 |---|---|
@@ -128,6 +150,13 @@ The pipeline logs every run (success and failure) to `pipeline_log` via TRY/CATC
 | 5. Agent Drill-Down | 90-day breakdown for any individual agent |
 | 6. Trends | Volume + quality metrics over 90 days |
 | 7. Pipeline Health | `pipeline_log` status view |
+| 8. KPI Alerts | Anomaly flags from `fact_kpi_anomalies` |
+| 9. Agent Risk | At-risk agent heat map from `fact_agent_risk` |
+| 10. Forecast | Next-week team KPI predictions from `agg_team_predictions` |
+
+## Tableau Public Dashboard
+
+Complementary dashboard covering the core KPIs — built on the same Azure SQL data, published publicly on Tableau Public for portfolio sharing.
 
 ---
 
