@@ -194,6 +194,18 @@ erDiagram
 
 ---
 
+## Azure Infrastructure (Live)
+
+| Resource | Name | Status |
+|---|---|---|
+| Resource Group | `agent-monitoring-rg` (East US) | Active |
+| SQL Server | `ecommerce-agent-srv-4d4842` (West US 2) | Ready |
+| SQL Database | `ecommerce_agent_db` (free serverless GP_S_Gen5) | Online — all 11 tables deployed |
+| ADLS Gen2 | `agentmonitoringdatalake` (West US 2) | Active |
+| Container | `bronze` | Created |
+
+---
+
 ## Repository Structure
 
 ```
