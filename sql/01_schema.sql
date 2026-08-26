@@ -36,13 +36,13 @@ CREATE TABLE dim_agents (
     team_id    INT          NOT NULL,
     agent_name VARCHAR(100) NOT NULL,
     hire_date  DATE         NOT NULL,
-    CONSTRAINT PK_dim_agents      PRIMARY KEY (agent_id),
-    CONSTRAINT FK_agents_team     FOREIGN KEY (team_id) REFERENCES dim_teams(team_id)
+    CONSTRAINT PK_dim_agents  PRIMARY KEY (agent_id),
+    CONSTRAINT FK_agents_team FOREIGN KEY (team_id) REFERENCES dim_teams(team_id)
 );
 
 CREATE TABLE dim_date (
     date_id     INT  NOT NULL,           -- YYYYMMDD integer key
-    date        DATE NOT NULL,
+    full_date   DATE NOT NULL,           -- renamed from 'date' (reserved keyword)
     day_of_week INT  NOT NULL,           -- 1=Mon … 7=Sun
     week_num    INT  NOT NULL,
     month_num   INT  NOT NULL,
@@ -60,11 +60,11 @@ CREATE TABLE fact_daily_metrics (
     team_id               INT           NOT NULL,
     channel_id            INT           NOT NULL,
     date_id               INT           NOT NULL,
-    -- universal KPIs
+    -- universal KPIs (all channels)
     items_handled         INT           NOT NULL,
-    resolution_rate       DECIMAL(5,2)  NULL,
-    csat_score            DECIMAL(4,2)  NULL,
-    -- Call / Chat
+    resolution_rate       DECIMAL(5,2)  NOT NULL,
+    csat_score            DECIMAL(3,2)  NOT NULL,   -- 1.00–5.00 scale
+    -- Call / Chat only
     aht_seconds           INT           NULL,
     -- Call only
     first_call_resolution DECIMAL(5,2)  NULL,
@@ -72,11 +72,13 @@ CREATE TABLE fact_daily_metrics (
     concurrent_chats_avg  DECIMAL(4,2)  NULL,
     -- Email only
     avg_response_hours    DECIMAL(6,2)  NULL,
+    -- Email / Issue Resolution
     sla_compliance        DECIMAL(5,2)  NULL,
     -- Issue Resolution only
     avg_days_to_close     DECIMAL(6,2)  NULL,
     reopen_rate           DECIMAL(5,2)  NULL,
     CONSTRAINT PK_fact_daily_metrics  PRIMARY KEY (metric_id),
+    CONSTRAINT UQ_fact_agent_date     UNIQUE (agent_id, date_id),   -- one row per agent per day
     CONSTRAINT FK_fact_agent          FOREIGN KEY (agent_id)   REFERENCES dim_agents(agent_id),
     CONSTRAINT FK_fact_team           FOREIGN KEY (team_id)    REFERENCES dim_teams(team_id),
     CONSTRAINT FK_fact_channel        FOREIGN KEY (channel_id) REFERENCES dim_channels(channel_id),
@@ -93,7 +95,7 @@ CREATE TABLE agg_team_daily (
     date_id              INT          NOT NULL,
     total_items_handled  INT          NOT NULL,
     avg_aht              DECIMAL(8,2) NULL,
-    avg_csat             DECIMAL(4,2) NULL,
+    avg_csat             DECIMAL(3,2) NULL,
     avg_resolution_rate  DECIMAL(5,2) NULL,
     avg_fcr              DECIMAL(5,2) NULL,   -- Call
     avg_concurrent_chats DECIMAL(4,2) NULL,   -- Chat
@@ -137,10 +139,10 @@ CREATE TABLE fact_agent_risk (
 );
 
 CREATE TABLE agg_team_predictions (
-    pred_id          INT          NOT NULL IDENTITY(1,1),
-    team_id          INT          NOT NULL,
-    prediction_date  DATE         NOT NULL,
-    predicted_kpi    VARCHAR(50)  NOT NULL,
+    pred_id          INT           NOT NULL IDENTITY(1,1),
+    team_id          INT           NOT NULL,
+    prediction_date  DATE          NOT NULL,
+    predicted_kpi    VARCHAR(50)   NOT NULL,
     predicted_value  DECIMAL(10,4) NOT NULL,
     lower_bound      DECIMAL(10,4) NULL,
     upper_bound      DECIMAL(10,4) NULL,

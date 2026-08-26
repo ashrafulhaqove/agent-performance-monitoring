@@ -164,16 +164,17 @@ erDiagram
 
     dim_service_lines ||--o{ dim_teams : ""
     dim_channels ||--o{ dim_teams : ""
-    dim_agents }o--|| dim_teams : ""
+    dim_teams ||--o{ dim_agents : ""
     dim_date ||--o{ fact_daily_metrics : ""
     dim_agents ||--o{ fact_daily_metrics : ""
     dim_channels ||--o{ fact_daily_metrics : ""
     dim_teams ||--o{ fact_daily_metrics : ""
     dim_teams ||--o{ agg_team_daily : ""
     dim_date ||--o{ agg_team_daily : ""
-    agg_team_daily ||--o{ fact_kpi_anomalies : ""
-    fact_daily_metrics ||--o{ fact_agent_risk : ""
-    agg_team_daily ||--o{ agg_team_predictions : ""
+    dim_teams ||--o{ fact_kpi_anomalies : ""
+    dim_date ||--o{ fact_kpi_anomalies : ""
+    dim_agents ||--o{ fact_agent_risk : ""
+    dim_teams ||--o{ agg_team_predictions : ""
 ```
 
 
@@ -187,7 +188,7 @@ erDiagram
 | `dim_date` | 90 | Date dimension for the simulation window |
 | `fact_daily_metrics` | 45,000 | Raw daily KPIs per agent; channel-specific columns NULL where not applicable |
 | `agg_team_daily` | ~1,440 | Team-level aggregates refreshed daily via MERGE stored procedure |
-| `fact_kpi_anomalies` | varies | Anomaly flags on team KPIs (Isolation Forest) |
+| `fact_kpi_anomalies` | varies | Anomaly flags on team KPIs — Call, Chat, Email, IR (Isolation Forest) |
 | `fact_agent_risk` | ~500/week | Per-agent risk score and flag from ML classifier |
 | `agg_team_predictions` | ~16/week | Next-week team KPI forecasts from regression model |
 | `pipeline_log` | 1 per run | ADF pipeline run status, row counts, and error messages |
