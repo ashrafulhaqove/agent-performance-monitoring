@@ -58,7 +58,7 @@ Each service line operates across 4 channels × 2 directions (inbound + outbound
 | Layer | Service | Tier |
 |---|---|---|
 | Data Lake | Azure Data Lake Storage Gen2 (`agentmonitoringdatalake`) | Free (5 GB/month) |
-| Warehouse | Azure SQL Database (`agent_db`, server: `agent-monitoring-server`) | Free F0 (32 GB) |
+| Warehouse | Azure SQL Database (`ecommerce_agent_db`, server: `ecommerce-agent-srv-4d4842`) | Free serverless GP_S_Gen5 |
 | Orchestration | Azure Data Factory (`agent-monitoring-adf`) | Free (1,000 DIU-hrs/month) |
 | Streaming | Upstash Kafka (topic: `agent-metrics`) | Free serverless |
 | Functions | Azure Functions (`kafka_consumer`) | Free (1M executions/month) |
@@ -70,6 +70,114 @@ Each service line operates across 4 channels × 2 directions (inbound + outbound
 
 ## Schema (Star Schema in Azure SQL)
 
+```mermaid
+erDiagram
+    dim_date {
+        int date_id PK
+        date date
+        int day_of_week
+        int week_num
+        int month_num
+        int quarter
+    }
+    dim_service_lines {
+        int service_line_id PK
+        varchar service_line_name
+    }
+    dim_channels {
+        int channel_id PK
+        varchar channel_name
+        varchar direction
+    }
+    dim_teams {
+        int team_id PK
+        int service_line_id FK
+        int channel_id FK
+        varchar team_name
+    }
+    dim_agents {
+        int agent_id PK
+        int team_id FK
+        varchar agent_name
+        date hire_date
+    }
+    fact_daily_metrics {
+        int metric_id PK
+        int agent_id FK
+        int team_id FK
+        int channel_id FK
+        int date_id FK
+        int items_handled
+        decimal resolution_rate
+        decimal csat_score
+        int aht_seconds
+        decimal first_call_resolution
+        decimal concurrent_chats_avg
+        decimal avg_response_hours
+        decimal sla_compliance
+        decimal avg_days_to_close
+        decimal reopen_rate
+    }
+    agg_team_daily {
+        int agg_id PK
+        int team_id FK
+        int date_id FK
+        int total_items_handled
+        decimal avg_aht
+        decimal avg_csat
+        decimal avg_resolution_rate
+    }
+    fact_kpi_anomalies {
+        int anomaly_id PK
+        int team_id FK
+        int date_id FK
+        varchar kpi_name
+        decimal anomaly_score
+        bit is_anomaly
+    }
+    fact_agent_risk {
+        int risk_id PK
+        int agent_id FK
+        date scored_date
+        decimal risk_score
+        bit risk_flag
+        varchar top_risk_factor
+    }
+    agg_team_predictions {
+        int pred_id PK
+        int team_id FK
+        date prediction_date
+        varchar predicted_kpi
+        decimal predicted_value
+        decimal lower_bound
+        decimal upper_bound
+    }
+    pipeline_log {
+        int log_id PK
+        date run_date
+        varchar pipeline_name
+        varchar status
+        int rows_loaded
+        varchar error_message
+        int duration_secs
+    }
+
+    dim_service_lines ||--o{ dim_teams : ""
+    dim_channels ||--o{ dim_teams : ""
+    dim_agents }o--|| dim_teams : ""
+    dim_date ||--o{ fact_daily_metrics : ""
+    dim_agents ||--o{ fact_daily_metrics : ""
+    dim_channels ||--o{ fact_daily_metrics : ""
+    dim_teams ||--o{ fact_daily_metrics : ""
+    dim_teams ||--o{ agg_team_daily : ""
+    dim_date ||--o{ agg_team_daily : ""
+    agg_team_daily ||--o{ fact_kpi_anomalies : ""
+    fact_daily_metrics ||--o{ fact_agent_risk : ""
+    agg_team_daily ||--o{ agg_team_predictions : ""
+```
+
+
+
 | Table | Rows | Description |
 |---|---|---|
 | `dim_service_lines` | 2 | Customer Service, Seller Service |
@@ -79,7 +187,7 @@ Each service line operates across 4 channels × 2 directions (inbound + outbound
 | `dim_date` | 90 | Date dimension for the simulation window |
 | `fact_daily_metrics` | 45,000 | Raw daily KPIs per agent; channel-specific columns NULL where not applicable |
 | `agg_team_daily` | ~1,440 | Team-level aggregates refreshed daily via MERGE stored procedure |
-| `fact_kpi_anomalies` | varies | Anomaly flags on team KPIs (Azure AI Anomaly Detector) |
+| `fact_kpi_anomalies` | varies | Anomaly flags on team KPIs (Isolation Forest) |
 | `fact_agent_risk` | ~500/week | Per-agent risk score and flag from ML classifier |
 | `agg_team_predictions` | ~16/week | Next-week team KPI forecasts from regression model |
 | `pipeline_log` | 1 per run | ADF pipeline run status, row counts, and error messages |
