@@ -1,0 +1,42 @@
+{
+  "factory": "agent-monitoring-adf",
+  "resource_group": "agent-monitoring-rg",
+  "linked_services": [
+    "ls_azure_sql",
+    "ls_adls"
+  ],
+  "datasets": [
+    "ds_bronze_csv",
+    "ds_fact_daily_metrics"
+  ],
+  "pipelines": [
+    "pl_daily_team_aggregation"
+  ],
+  "pipeline": {
+    "parameters": {
+      "ExecutionDate": "String"
+    },
+    "activities": [
+      {
+        "name": "foreach_channel",
+        "type": "ForEach",
+        "items": [
+          "call",
+          "chat",
+          "email",
+          "issue_resolution"
+        ],
+        "sequential": true,
+        "inner": "copy_channel_csv_to_sql"
+      },
+      {
+        "name": "exec_sp_aggregate_team_metrics",
+        "type": "SqlServerStoredProcedure",
+        "procedure": "sp_aggregate_team_metrics",
+        "depends_on": [
+          "foreach_channel"
+        ]
+      }
+    ]
+  }
+}

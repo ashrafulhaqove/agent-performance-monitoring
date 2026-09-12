@@ -204,6 +204,7 @@ erDiagram
 | SQL Database | `ecommerce_agent_db` (free serverless GP_S_Gen5) | Online — all 11 tables deployed |
 | ADLS Gen2 | `agentmonitoringdatalake` (West US 2) | Active |
 | Container | `bronze` | 360 CSVs loaded (90 days × 4 channels) |
+| Data Factory | `agent-monitoring-adf` (West US 2) | Active — `pl_daily_team_aggregation` deployed |
 
 ---
 
