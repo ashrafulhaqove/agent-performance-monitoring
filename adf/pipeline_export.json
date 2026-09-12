@@ -1,0 +1,88 @@
+{
+  "properties": {
+    "parameters": {
+      "ExecutionDate": { "type": "String" }
+    },
+    "activities": [
+      {
+        "name": "foreach_channel",
+        "type": "ForEach",
+        "typeProperties": {
+          "isSequential": true,
+          "items": {
+            "value": "@json('[{\"channel\":\"call\"},{\"channel\":\"chat\"},{\"channel\":\"email\"},{\"channel\":\"issue_resolution\"}]')",
+            "type": "Expression"
+          },
+          "activities": [
+            {
+              "name": "copy_channel_csv_to_sql",
+              "type": "Copy",
+              "inputs": [
+                {
+                  "referenceName": "ds_bronze_csv",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "channel":   { "value": "@item().channel",                          "type": "Expression" },
+                    "file_date": { "value": "@pipeline().parameters.ExecutionDate",     "type": "Expression" }
+                  }
+                }
+              ],
+              "outputs": [
+                {
+                  "referenceName": "ds_fact_daily_metrics",
+                  "type": "DatasetReference"
+                }
+              ],
+              "typeProperties": {
+                "source": {
+                  "type": "DelimitedTextSource",
+                  "storeSettings": {
+                    "type": "AzureBlobFSReadSettings",
+                    "recursive": false
+                  },
+                  "formatSettings": {
+                    "type": "DelimitedTextReadSettings"
+                  }
+                },
+                "sink": {
+                  "type": "AzureSqlSink",
+                  "writeBatchSize": 10000,
+                  "writeBatchTimeout": "00:30:00",
+                  "sqlWriterUseTableLock": false,
+                  "writeBehavior": "upsert",
+                  "upsertSettings": {
+                    "useTempDB": true,
+                    "keys": ["agent_id", "date_id"]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "exec_sp_aggregate_team_metrics",
+        "type": "SqlServerStoredProcedure",
+        "dependsOn": [
+          {
+            "activity": "foreach_channel",
+            "dependencyConditions": ["Succeeded"]
+          }
+        ],
+        "linkedServiceName": {
+          "referenceName": "ls_azure_sql",
+          "type": "LinkedServiceReference"
+        },
+        "typeProperties": {
+          "storedProcedureName": "sp_aggregate_team_metrics",
+          "storedProcedureParameters": {
+            "ExecutionDate": {
+              "value": { "value": "@pipeline().parameters.ExecutionDate", "type": "Expression" },
+              "type":  "String"
+            }
+          }
+        }
+      }
+    ]
+  }
+}

@@ -241,7 +241,14 @@ def upload_csvs(rows):
 
             blob_name = f"{ch_slug}/{d.strftime('%Y-%m-%d')}.csv"
             buf = io.StringIO()
-            day_df.to_csv(buf, index=False)
+            # Cast INT columns to pandas Int64 so NaN-containing cols write without ".0"
+            int_cols = ["agent_id", "team_id", "channel_id", "date_id",
+                        "items_handled", "aht_seconds"]
+            out = day_df.copy()
+            for c in int_cols:
+                if c in out.columns:
+                    out[c] = out[c].astype("Int64")
+            out.to_csv(buf, index=False)
 
             blob = blob_client.get_blob_client(container=CONTAINER, blob=blob_name)
             blob.upload_blob(buf.getvalue(), overwrite=True)
